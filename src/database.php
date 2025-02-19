@@ -1,6 +1,7 @@
 <?php
 
 use Dotenv\Dotenv;
+use ORM;
 
 try {
     // Load environment variables

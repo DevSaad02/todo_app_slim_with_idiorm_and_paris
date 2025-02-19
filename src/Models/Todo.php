@@ -11,21 +11,35 @@ use Model;
 
 class Todo extends Model
 {
+    // Use short table name
     public static $_table_use_short_name = true;
 
-    public static $_table = 'todo_list';
+    // Table name
+    public const TABLE_NAME = 'todo_list';
+    public static $_table = self::TABLE_NAME;
 
-    public static $_id_column = 'id';
+    // Primary key column
+    public const ID_COLUMN = 'id';
+    public static $_id_column = self::ID_COLUMN;
 
-       // Convert a single record to an array
-       public function toArray(): array
-       {
-           return $this->as_array();
-       }
-   
-       // Convert a collection of records to an array
-       public static function toCollectionArray($records): array
-       {
-           return array_map(fn($record) => $record->toArray(), $records);
-       }
+    /**
+     * Convert a single record to an array
+     *
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return $this->as_array();
+    }
+
+    /**
+     * Convert a collection of records to an array
+     *
+     * @param array $records
+     * @return array
+     */
+    public static function toCollectionArray(array $records): array
+    {
+        return array_map(fn($record) => $record->toArray(), $records);
+    }
 }
