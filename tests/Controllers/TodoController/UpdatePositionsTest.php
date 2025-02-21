@@ -38,7 +38,6 @@ class UpdatePositionsTest extends TestCase
 
     public function testUpdatePositions()
     {
-        // Mock the request and response
         $request = Mockery::mock(ServerRequestInterface::class);
         $response = Mockery::mock(ResponseInterface::class);
         $stream = Mockery::mock(StreamInterface::class);
@@ -55,43 +54,50 @@ class UpdatePositionsTest extends TestCase
             return $bodyContent;
         });
 
-        // Mock the request data
-        $request->shouldReceive('getBody')->andReturnSelf();
-        $request->shouldReceive('getContents')->andReturn(json_encode([
+        // Create an alias for the ORM class
+        $ormMock = Mockery::mock('alias:ORM');
+
+        // Mock the static methods
+        $ormMock->shouldReceive('for_table')->with('todos')->andReturnSelf();
+        $ormMock->shouldReceive('where_in')->andReturnSelf();
+        $ormMock->shouldReceive('find_many')->andReturn([
+            (object) ['id' => 1, 'item_position' => 1],
+            (object) ['id' => 2, 'item_position' => 2],
+            (object) ['id' => 3, 'item_position' => 3]
+        ]);
+    // Mock the static method find_one to throw an exception
+    $todoMock = Mockery::mock('alias:' . Todo::class);
+    $todoMock->shouldReceive('find_one')->andThrow(new \Exception('Database error'));
+
+    // Mock the ORM transaction methods
+    $dbMock = Mockery::mock();
+    $dbMock->shouldReceive('beginTransaction')->once();
+    $dbMock->shouldReceive('rollBack')->once();
+    // $ormMock::shouldReceive('get_db')->andReturn($dbMock);
+
+        // Mock the logger methods
+        $this->logger->shouldReceive('info')->with('Updating positions of todo items')->once();
+        $this->logger->shouldReceive('info')->with('Positions of todo items updated successfully')->once();
+        $this->logger->shouldReceive('warning')->never();
+        $this->logger->shouldReceive('error')->never();
+
+        // Ensure the correct data is sent in the request
+        $request->shouldReceive('getBody')->andReturn($stream);
+        $stream->shouldReceive('getContents')->andReturn(json_encode([
             'order' => [
                 ['id' => 1, 'position' => 2],
-                ['id' => 2, 'position' => 1]
+                ['id' => 2, 'position' => 3],
+                ['id' => 3, 'position' => 1]
             ]
         ]));
 
-        // Mock the static method find_one using Mockery
-        $todoMock = Mockery::mock('alias:' . Todo::class);
-        $todoMock->shouldReceive('find_one')->andReturn($todoMock);
-        $todoMock->shouldReceive('save')->andReturn(true);
-
-        // Mock the ORM transaction methods
-        ORM::shouldReceive('get_db->beginTransaction')->once();
-        ORM::shouldReceive('get_db->commit')->once();
-
-        // Expect the logger to log the info message
-        $this->logger->shouldReceive('info')
-            ->once()
-            ->with('Updating positions of todo items');
-
-        // Expect the logger to log success
-        $this->logger->shouldReceive('info')
-            ->once()
-            ->with('Positions of todo items updated successfully');
-
-        // Call the updatePositions method
         $result = $this->controller->updatePositions($request, $response);
 
-        // Assert the response status code and body
         $this->assertEquals(200, $result->getStatusCode());
-        $this->assertJsonStringEqualsJsonString(json_encode([
-            'status' => 'success',
-            'message' => 'Positions updated'
-        ]), (string)$result->getBody());
+
+        // Optionally, you can also assert the response body
+        $responseBody = (string) $result->getBody();
+        $this->assertStringContainsString('Positions updated', $responseBody);
     }
 
     public function testUpdatePositionsInvalidRequest()

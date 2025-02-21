@@ -7,13 +7,16 @@ use Slim\Views\Twig;
 use DI\ContainerBuilder;
 use Psr\Log\LoggerInterface;
 use Twig\Loader\FilesystemLoader;
-use Monolog\Handler\RotatingFileHandler;
 use Monolog\Processor\UidProcessor;
 use Monolog\Formatter\LineFormatter;
 use Psr\Container\ContainerInterface;
+use App\Services\ArrayConversionService;
+use Monolog\Handler\RotatingFileHandler;
 use App\Application\Settings\SettingsInterface;
 
 return function (ContainerBuilder $containerBuilder) {
+    // Configure Paris ORM
+    Model::$auto_prefix_models = '\\App\\Models\\';
     // Add service definitions to the container
     $containerBuilder->addDefinitions([
         // Define the LoggerInterface service
@@ -51,6 +54,10 @@ return function (ContainerBuilder $containerBuilder) {
             $loader = new FilesystemLoader(__DIR__ . '/../src/Templates');
             // Create a new Twig instance with the specified loader and cache settings
             return new Twig($loader, ['cache' => false]);
+        },
+         // Define the ArrayConversionService
+         ArrayConversionService::class => function (ContainerInterface $c) {
+            return new ArrayConversionService();
         },
     ]);
 };

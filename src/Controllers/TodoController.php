@@ -1,23 +1,25 @@
 <?php
-
 namespace App\Controllers;
 
-use App\Models\Todo;
+use ORM;
+use Model;
 use Slim\Views\Twig;
+use Psr\Log\LoggerInterface;
+use App\Services\ArrayConversionService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use ORM;
-use Psr\Log\LoggerInterface;
 
 class TodoController extends HomeController
 {
     protected $view;
     protected $logger;
+    private $arrayConversionService;
 
-    public function __construct(Twig $view, LoggerInterface $logger)
+    public function __construct(Twig $view, LoggerInterface $logger, ArrayConversionService $arrayConversionService)
     {
         $this->view = $view;
         $this->logger = $logger;
+        $this->arrayConversionService = $arrayConversionService;
     }
 
     public function index(Request $request, Response $response)
@@ -39,11 +41,11 @@ class TodoController extends HomeController
     {
         $this->logger->info("Fetching all todos");
         try {
-            $todos = Todo::find_many(); // Fetch all todos from database
+            $todos = Model::factory('TodoList')->find_many(); // Fetch all todos from database
             $data = [
                 'status' => 'success',
                 'message' => 'All Todos List',
-                'todos' => Todo::toCollectionArray($todos)
+                'todos' => $this->arrayConversionService->convertCollectionToArray($todos)
             ];
             $this->logger->info("Todos fetched successfully", ['todos_count' => count($todos)]);
             return $this->response($response, $data);
@@ -75,11 +77,11 @@ class TodoController extends HomeController
             }
 
             // Get the max position from the existing records
-            $maxPosition = Todo::max('item_position') ?? 0;
+            $maxPosition = Model::factory('TodoList')->max('item_position') ?? 0;
             $newPosition = $maxPosition + 1;
 
             // Create a new Todo item using ORM
-            $todo = Todo::create();
+            $todo = Model::factory('TodoList')->create();
             $todo->description = $description;
             $todo->item_position = $newPosition;
             $todo->save();
@@ -87,7 +89,7 @@ class TodoController extends HomeController
             $data = [
                 'status' => 'success',
                 'message' => 'Item added successfully',
-                'todo' => $todo ? $todo->toArray() : null
+                'todo' => $todo ? $this->arrayConversionService->convertToArray($todo) : null
             ];
             $this->logger->info("Todo item stored successfully", ['todo_id' => $todo->id]);
             return $this->response($response, $data, 201);
@@ -132,7 +134,7 @@ class TodoController extends HomeController
             }
 
             // Find the todo item
-            $todo = Todo::find_one($id);
+            $todo = Model::factory('TodoList')->find_one($id);
             if (!$todo) {
                 $this->logger->warning("Todo not found", ['todo_id' => $id]);
                 $data = [
@@ -148,7 +150,7 @@ class TodoController extends HomeController
                 $data = [
                     'status' => 'success',
                     'message' => 'Item updated successfully',
-                    'todo' => $todo ? $todo->toArray() : null
+                    'todo' => $todo ? $this->arrayConversionService->convertToArray($todo) : null
                 ];
                 $this->logger->info("Todo item updated successfully", ['todo_id' => $id]);
                 return $this->response($response, $data, 200);
@@ -190,7 +192,7 @@ class TodoController extends HomeController
             }
 
             // Find the todo item
-            $todo = Todo::find_one($id);
+            $todo = Model::factory('TodoList')->find_one($id);
             if (!$todo) {
                 $this->logger->warning("Todo not found", ['todo_id' => $id]);
                 $data = [
@@ -257,7 +259,7 @@ class TodoController extends HomeController
                 return $this->response($response, $data, 400);
             }
 
-            $todo = Todo::find_one($id);
+            $todo = Model::factory('TodoList')->find_one($id);
             if (!$todo) {
                 $this->logger->warning("Todo not found", ['todo_id' => $id]);
                 $data = [
@@ -299,6 +301,7 @@ class TodoController extends HomeController
         try {
             $data = json_decode($request->getBody()->getContents(), true);
             if (!isset($data["order"]) || !is_array($data["order"])) {
+
                 $this->logger->warning("Invalid request for updating positions");
                 $data = [
                     'status' => 'error',
@@ -316,7 +319,7 @@ class TodoController extends HomeController
 
             foreach ($batches as $batch) {
                 $ids = array_column($batch, 'id');
-                $todos = Todo::where_in('id', $ids)->find_many();
+                $todos = Model::factory('TodoList')->where_in('id', $ids)->find_many();
 
                 foreach ($batch as $item) {
                     $id = (int)($item["id"] ?? 0);
@@ -363,7 +366,7 @@ class TodoController extends HomeController
             ORM::get_db()->beginTransaction(); // Start transaction
 
             // Find the todo item
-            $todo = Todo::find_one($id);
+            $todo = Model::factory('TodoList')->find_one($id);
             if (!$todo) {
                 $this->logger->warning("Todo item not found", ['todo_id' => $id]);
                 return $this->response($response, [
@@ -381,7 +384,7 @@ class TodoController extends HomeController
             }
 
             // Shift positions down for items that had a higher position than the deleted item
-            $todos = Todo::where_gt('item_position', $deletedPosition)->find_many();
+            $todos = Model::factory('TodoList')->where_gt('item_position', $deletedPosition)->find_many();
             foreach ($todos as $item) {
                 $item->item_position -= 1;
                 $item->save();
